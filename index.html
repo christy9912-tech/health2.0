@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Trends 監控中心</title>
+    <!-- 使用 Tailwind CSS CDN 保持樣式簡潔 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            background-color: #0F172A;
+            color: #F8FAFC;
+            font-family: 'Inter', "Noto Sans TC", sans-serif;
+            scroll-behavior: smooth;
+        }
+
+        /* 捲軸樣式優化 */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #0F172A; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; border: 2px solid #0F172A; }
+
+        .trends-card {
+            background-color: #1E293B;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 600px;
+            border: 2px solid #334155;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .trends-card:hover {
+            transform: translateY(-8px);
+            border-color: #3B82F6;
+        }
+
+        /* 載入動畫效果 */
+        .loading-shimmer {
+            background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        iframe {
+            border-radius: 0 0 1.5rem 1.5rem;
+            /* 讓 Google Widget 與暗色背景融合 */
+            filter: invert(0.9) hue-rotate(180deg) brightness(1.2) contrast(0.85);
+            flex-grow: 1;
+        }
+
+        .section-header {
+            position: relative;
+            display: inline-block;
+            padding-left: 1.5rem;
+            margin: 4rem 0 2.5rem;
+        }
+        .section-header::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0; width: 8px;
+            background: #3B82F6; border-radius: 4px;
+        }
+
+        .tab-active {
+            background-color: #3B82F6;
+            color: #FFFFFF !important;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.6);
+            transform: scale(1.05);
+        }
+
+        .retry-btn {
+            font-size: 14px;
+            font-weight: 900;
+            background: #3B82F6;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+        .retry-btn:hover { background: #2563EB; transform: scale(1.1); }
+
+        /* 讀取中的遮罩樣式 */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            background-color: #1E293B;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-32">
+
+    <!-- 頂部標題與控制項 -->
+    <header class="sticky top-0 z-50 bg-[#0F172A]/95 backdrop-blur-xl border-b border-slate-700 p-8 shadow-2xl">
+        <div class="max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div class="text-center lg:text-left">
+                <h1 class="text-5xl md:text-8xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-white to-emerald-400">
+                    TRENDS 監控中心
+                </h1>
+                <p class="text-white text-xl md:text-3xl mt-4 font-bold flex items-center justify-center lg:justify-start gap-3">
+                    <span class="inline-block w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.5)]"></span>
+                    台灣區域 (TW) · <span id="current-range-text" class="text-blue-400 font-black">過去 7 天</span>
+                </p>
+            </div>
+            
+            <div class="flex flex-col items-center lg:items-end gap-6">
+                <div class="inline-flex p-2 bg-slate-800 rounded-2xl border-2 border-slate-600 shadow-inner">
+                    <button onclick="switchTimeRange('now 7-d')" id="btn-7d" class="px-12 py-4 text-2xl font-black rounded-xl transition-all tab-active text-white">
+                        過去 7 天
+                    </button>
+                    <button onclick="switchTimeRange('today 1-m')" id="btn-30d" class="px-12 py-4 text-2xl font-black rounded-xl transition-all text-slate-400 hover:text-white ml-2">
+                        過去 30 天
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto px-8">
+        <div id="dashboard-content">
+            <!-- 由 JS 動態生成內容 -->
+        </div>
+    </main>
+
+    <footer class="max-w-7xl mx-auto mt-32 pt-16 border-t border-slate-700 text-center">
+        <p class="font-black text-white text-4xl mb-4">資料來源：Google Trends</p>
+        <p class="text-slate-400 text-2xl max-w-4xl mx-auto font-bold">
+            ※ 載入圖表約需 25 秒全數完成。若顯示「Request Error」，請點擊卡片右上角的 <span class="text-blue-400">RETRY</span> 重新讀取。
+        </p>
+    </footer>
+
+    <!-- Google Trends 載入器 -->
+    <script type="text/javascript" src="https://ssl.gstatic.com/trends_nrtr/4284_RC01/embed_loader.js"></script>
+
+    <script type="text/javascript">
+        const CATEGORIES = [
+            { id: 456, name: "營養", group: "food", groupName: "飲食與營養" },
+            { id: 908, name: "蔬果", group: "food" },
+            { id: 910, name: "湯品", group: "food" },
+            { id: 825, name: "素食", group: "food" },
+            { id: 909, name: "肉品海鮮", group: "food" },
+            { id: 237, name: "保健食品", group: "food" },
+            { id: 1282, name: "補助", group: "welfare", groupName: "社會福利與補助" },
+            { id: 619, name: "退休與補助金", group: "welfare" },
+            { id: 1239, name: "中醫", group: "health_general", groupName: "醫療與健康概況" },
+            { id: 623, name: "老年醫學", group: "health_general" },
+            { id: 419, name: "健康狀況", group: "health_general" },
+            { id: 184, name: "名人", group: "health_general" },
+            { id: 429, name: "癌症", group: "diseases", groupName: "疾病與生理系統" },
+            { id: 1328, name: "內分泌疾病", group: "diseases" },
+            { id: 559, name: "心臟病高血壓", group: "diseases" },
+            { id: 420, name: "皮膚病", group: "diseases" },
+            { id: 1211, name: "耳鼻喉", group: "diseases" },
+            { id: 824, name: "呼吸系統問題", group: "diseases" },
+            { id: 638, name: "胃食道逆流", group: "diseases" },
+            { id: 819, name: "疼痛控制", group: "diseases" },
+            { id: 942, name: "神經系統疾病", group: "diseases" },
+            { id: 629, name: "普通感冒與流行感冒", group: "diseases" }
+        ];
+
+        let currentTimeRange = 'now 7-d';
+        let isRendering = false;
+
+        // 初始化
+        window.onload = function() {
+            renderStructure();
+            startSequentialLoad(currentTimeRange);
+        };
+
+        // 建立 HTML 結構
+        function renderStructure() {
+            const container = document.getElementById('dashboard-content');
+            container.innerHTML = '';
+            let currentGroup = "";
+
+            CATEGORIES.forEach(cat => {
+                if (cat.group !== currentGroup) {
+                    currentGroup = cat.group;
+                    // 建立分組標題
+                    const header = document.createElement('div');
+                    header.className = 'section-header w-full';
+                    header.innerHTML = `<h2 class="text-5xl font-black text-blue-400 tracking-widest uppercase">${cat.groupName}</h2>`;
+                    container.appendChild(header);
+
+                    // 建立網格
+                    const grid = document.createElement('div');
+                    grid.id = `grid-${cat.group}`;
+                    grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 mb-24';
+                    container.appendChild(grid);
+                }
+
+                const gridContainer = document.getElementById(`grid-${cat.group}`);
+                const card = document.createElement('div');
+                card.className = 'trends-card relative';
+                card.innerHTML = `
+                    <div class="px-8 py-6 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
+                        <h3 class="font-black text-3xl text-white tracking-tight">${cat.name}</h3>
+                        <button onclick="loadWidget(${cat.id}, currentTimeRange)" class="retry-btn">RETRY</button>
+                    </div>
+                    <div id="loading-${cat.id}" class="loading-overlay">
+                        <div class="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+                        <span class="text-slate-400 font-bold text-2xl animate-pulse">載入中...</span>
+                    </div>
+                    <div id="trend-widget-${cat.id}" class="w-full h-full"></div>
+                `;
+                gridContainer.appendChild(card);
+            });
+        }
+
+        // 循序加載 Widget
+        function startSequentialLoad(range) {
+            isRendering = true;
+            CATEGORIES.forEach((cat, index) => {
+                setTimeout(() => {
+                    loadWidget(cat.id, range);
+                    if (index === CATEGORIES.length - 1) isRendering = false;
+                }, index * 1200); // 1.2秒間隔
+            });
+        }
+
+        // 單獨載入 Widget
+        function loadWidget(catId, range) {
+            const container = document.getElementById(`trend-widget-${catId}`);
+            const loader = document.getElementById(`loading-${catId}`);
+            
+            if (!container) return;
+            
+            container.innerHTML = '';
+            loader.style.display = 'flex';
+            
+            try {
+                window.trends.embed.renderExploreWidgetTo(
+                    container,
+                    "RELATED_QUERIES",
+                    {
+                        "comparisonItem": [{ "geo": "TW", "time": range }],
+                        "category": catId,
+                        "property": ""
+                    },
+                    {
+                        "exploreQuery": `cat=${catId}&date=${encodeURIComponent(range)}&geo=TW&hl=zh-TW`,
+                        "guestPath": "https://trends.google.com.tw:443/trends/embed/"
+                    }
+                );
+                // 延遲一點點時間再隱藏讀取動畫，確保 iframe 已生成
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                }, 2500);
+            } catch (e) {
+                console.error(e);
+                loader.innerHTML = `<span class="text-red-500 font-bold text-xl">載入失敗，請重試</span>`;
+            }
+        }
+
+        // 切換時間
+        function switchTimeRange(range) {
+            if (currentTimeRange === range || isRendering) return;
+            currentTimeRange = range;
+
+            // 更新按鈕樣式
+            document.getElementById('btn-7d').className = `px-12 py-4 text-2xl font-black rounded-xl transition-all ${range === 'now 7-d' ? 'tab-active text-white' : 'text-slate-400 hover:text-white'}`;
+            document.getElementById('btn-30d').className = `px-12 py-4 text-2xl font-black rounded-xl transition-all ml-2 ${range === 'today 1-m' ? 'tab-active text-white' : 'text-slate-400 hover:text-white'}`;
+            document.getElementById('current-range-text').innerText = range === 'now 7-d' ? '過去 7 天' : '過去 30 天';
+
+            // 重新載入所有內容
+            renderStructure();
+            startSequentialLoad(range);
+        }
+    </script>
+</body>
+</html>
