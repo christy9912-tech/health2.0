@@ -27,7 +27,7 @@
             overflow: hidden;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            height: 600px;
+            height: 650px; /* 稍微增加高度以容納放大後的內容 */
             border: 2px solid #334155;
             display: flex;
             flex-direction: column;
@@ -36,9 +36,9 @@
         .trends-card:hover {
             transform: translateY(-8px);
             border-color: #3B82F6;
+            box-shadow: 0 25px 30px -5px rgba(59, 130, 246, 0.2);
         }
 
-        /* 載入動畫效果 */
         .loading-shimmer {
             background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
             background-size: 200% 100%;
@@ -49,11 +49,27 @@
             100% { background-position: -200% 0; }
         }
 
+        /* 優化 iframe 縮放以放大搜尋查詢文字 */
+        .widget-container {
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+            background-color: #fff; /* 預設背景，過濾器會將其轉黑 */
+        }
+
         iframe {
             border-radius: 0 0 1.5rem 1.5rem;
-            /* 讓 Google Widget 與暗色背景融合 */
+            /* 顏色過濾器：將白底 Widget 轉為黑底 */
             filter: invert(0.9) hue-rotate(180deg) brightness(1.2) contrast(0.85);
-            flex-grow: 1;
+            position: absolute;
+            top: 0;
+            left: 0;
+            /* 關鍵：透過 scale 放大內部文字 */
+            transform: scale(1.15); 
+            transform-origin: top left;
+            width: 86.95% !important; /* 100 / 1.15 補償寬度 */
+            height: 86.95% !important; /* 100 / 1.15 補償高度 */
+            transition: opacity 0.5s ease;
         }
 
         .section-header {
@@ -87,8 +103,8 @@
             text-transform: uppercase;
         }
         .retry-btn:hover { background: #2563EB; transform: scale(1.1); }
+        .retry-btn:active { transform: scale(0.95); }
 
-        /* 讀取中的遮罩樣式 */
         .loading-overlay {
             position: absolute;
             inset: 0;
@@ -105,7 +121,7 @@
 <body class="min-h-screen pb-32">
 
     <!-- 頂部標題與控制項 -->
-    <header class="sticky top-0 z-50 bg-[#0F172A]/95 backdrop-blur-xl border-b border-slate-700 p-8 shadow-2xl">
+    <header class="bg-[#0F172A] border-b border-slate-700 p-8 shadow-2xl">
         <div class="max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-8">
             <div class="text-center lg:text-left">
                 <h1 class="text-5xl md:text-8xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-white to-emerald-400">
@@ -158,6 +174,7 @@
             { id: 619, name: "退休與補助金", group: "welfare" },
             { id: 1239, name: "中醫", group: "health_general", groupName: "醫療與健康概況" },
             { id: 947, name: "公共健康", group: "health_general" },
+            { keyword: "睡眠", name: "睡眠", group: "health_general" },
             { id: 623, name: "老年醫學", group: "health_general" },
             { id: 419, name: "健康狀況", group: "health_general" },
             { id: 184, name: "名人", group: "health_general" },
@@ -176,28 +193,24 @@
         let currentTimeRange = 'now 7-d';
         let isRendering = false;
 
-        // 初始化
         window.onload = function() {
             renderStructure();
             startSequentialLoad(currentTimeRange);
         };
 
-        // 建立 HTML 結構
         function renderStructure() {
             const container = document.getElementById('dashboard-content');
             container.innerHTML = '';
             let currentGroup = "";
 
-            CATEGORIES.forEach(cat => {
+            CATEGORIES.forEach((cat, index) => {
                 if (cat.group !== currentGroup) {
                     currentGroup = cat.group;
-                    // 建立分組標題
                     const header = document.createElement('div');
                     header.className = 'section-header w-full';
                     header.innerHTML = `<h2 class="text-5xl font-black text-blue-400 tracking-widest uppercase">${cat.groupName}</h2>`;
                     container.appendChild(header);
 
-                    // 建立網格
                     const grid = document.createElement('div');
                     grid.id = `grid-${cat.group}`;
                     grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 mb-24';
@@ -207,57 +220,67 @@
                 const gridContainer = document.getElementById(`grid-${cat.group}`);
                 const card = document.createElement('div');
                 card.className = 'trends-card relative';
+                const uniqueId = cat.id || `kw-${index}`;
                 card.innerHTML = `
                     <div class="px-8 py-6 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
                         <h3 class="font-black text-3xl text-white tracking-tight">${cat.name}</h3>
-                        <button onclick="loadWidget(${cat.id}, currentTimeRange)" class="retry-btn">RETRY</button>
+                        <button onclick="loadWidgetByIndex(${index}, currentTimeRange)" class="retry-btn">RETRY</button>
                     </div>
-                    <div id="loading-${cat.id}" class="loading-overlay">
-                        <div class="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-                        <span class="text-slate-400 font-bold text-2xl animate-pulse">載入中...</span>
+                    <div class="widget-container">
+                        <div id="loading-${uniqueId}" class="loading-overlay">
+                            <div class="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+                            <span class="text-slate-400 font-bold text-2xl animate-pulse">載入中...</span>
+                        </div>
+                        <div id="trend-widget-${uniqueId}" class="w-full h-full"></div>
                     </div>
-                    <div id="trend-widget-${cat.id}" class="w-full h-full"></div>
                 `;
                 gridContainer.appendChild(card);
             });
         }
 
-        // 循序加載 Widget
         function startSequentialLoad(range) {
             isRendering = true;
             CATEGORIES.forEach((cat, index) => {
                 setTimeout(() => {
-                    loadWidget(cat.id, range);
+                    loadWidgetByIndex(index, range);
                     if (index === CATEGORIES.length - 1) isRendering = false;
-                }, index * 1200); // 1.2秒間隔
+                }, index * 1200);
             });
         }
 
-        // 單獨載入 Widget
-        function loadWidget(catId, range) {
-            const container = document.getElementById(`trend-widget-${catId}`);
-            const loader = document.getElementById(`loading-${catId}`);
+        function loadWidgetByIndex(index, range) {
+            const cat = CATEGORIES[index];
+            const uniqueId = cat.id || `kw-${index}`;
+            const container = document.getElementById(`trend-widget-${uniqueId}`);
+            const loader = document.getElementById(`loading-${uniqueId}`);
             
             if (!container) return;
             
             container.innerHTML = '';
             loader.style.display = 'flex';
             
+            const comparisonItem = cat.keyword 
+                ? [{ "keyword": cat.keyword, "geo": "TW", "time": range }]
+                : [{ "geo": "TW", "time": range }];
+            
+            const categoryValue = cat.keyword ? 0 : cat.id;
+
             try {
                 window.trends.embed.renderExploreWidgetTo(
                     container,
                     "RELATED_QUERIES",
                     {
-                        "comparisonItem": [{ "geo": "TW", "time": range }],
-                        "category": catId,
+                        "comparisonItem": comparisonItem,
+                        "category": categoryValue,
                         "property": ""
                     },
                     {
-                        "exploreQuery": `cat=${catId}&date=${encodeURIComponent(range)}&geo=TW&hl=zh-TW`,
+                        "exploreQuery": cat.keyword 
+                            ? `date=${encodeURIComponent(range)}&geo=TW&q=${encodeURIComponent(cat.keyword)}&hl=zh-TW`
+                            : `cat=${cat.id}&date=${encodeURIComponent(range)}&geo=TW&hl=zh-TW`,
                         "guestPath": "https://trends.google.com.tw:443/trends/embed/"
                     }
                 );
-                // 延遲一點點時間再隱藏讀取動畫，確保 iframe 已生成
                 setTimeout(() => {
                     loader.style.display = 'none';
                 }, 2500);
@@ -267,17 +290,14 @@
             }
         }
 
-        // 切換時間
         function switchTimeRange(range) {
             if (currentTimeRange === range || isRendering) return;
             currentTimeRange = range;
 
-            // 更新按鈕樣式
             document.getElementById('btn-7d').className = `px-12 py-4 text-2xl font-black rounded-xl transition-all ${range === 'now 7-d' ? 'tab-active text-white' : 'text-slate-400 hover:text-white'}`;
             document.getElementById('btn-30d').className = `px-12 py-4 text-2xl font-black rounded-xl transition-all ml-2 ${range === 'today 1-m' ? 'tab-active text-white' : 'text-slate-400 hover:text-white'}`;
             document.getElementById('current-range-text').innerText = range === 'now 7-d' ? '過去 7 天' : '過去 30 天';
 
-            // 重新載入所有內容
             renderStructure();
             startSequentialLoad(range);
         }
