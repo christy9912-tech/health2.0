@@ -3,44 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Trends 監控中心</title>
-    <!-- 使用 Tailwind CSS CDN 保持樣式簡潔 -->
+    <title>健康2.0 Google Trends 監控</title>
+    <!-- 使用 Tailwind CSS CDN 並設定為類別模式 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         
+        :root {
+            --root-font-size: 18px;
+        }
+
+        /* 透過根目錄字體大小控制全局比例 */
+        html {
+            font-size: var(--root-font-size);
+        }
+
         body {
-            background-color: #0F172A;
-            color: #F8FAFC;
             font-family: 'Inter', "Noto Sans TC", sans-serif;
             scroll-behavior: smooth;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         /* 捲軸樣式優化 */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: #0F172A; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; border: 2px solid #0F172A; }
+        ::-webkit-scrollbar { width: 0.625rem; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #64748b; border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
 
         .trends-card {
-            background-color: #1E293B;
             border-radius: 1.5rem;
             overflow: hidden;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            height: 650px; /* 稍微增加高度以容納放大後的內容 */
-            border: 2px solid #334155;
+            height: 40rem; /* 高度隨字體大小縮放 */
             display: flex;
             flex-direction: column;
         }
         
         .trends-card:hover {
-            transform: translateY(-8px);
-            border-color: #3B82F6;
-            box-shadow: 0 25px 30px -5px rgba(59, 130, 246, 0.2);
+            transform: translateY(-0.5rem);
+            box-shadow: 0 1.5rem 2rem -0.3rem rgba(59, 130, 246, 0.2);
         }
 
         .loading-shimmer {
-            background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
             background-size: 200% 100%;
             animation: shimmer 1.5s infinite linear;
         }
@@ -49,27 +57,28 @@
             100% { background-position: -200% 0; }
         }
 
-        /* 優化 iframe 縮放以放大搜尋查詢文字 */
         .widget-container {
             flex-grow: 1;
             overflow: hidden;
             position: relative;
-            background-color: #fff; /* 預設背景，過濾器會將其轉黑 */
         }
 
+        /* 核心縮放：保持 1.15 倍以放大內容，但容器隨全局縮放 */
         iframe {
             border-radius: 0 0 1.5rem 1.5rem;
-            /* 顏色過濾器：將白底 Widget 轉為黑底 */
-            filter: invert(0.9) hue-rotate(180deg) brightness(1.2) contrast(0.85);
             position: absolute;
             top: 0;
             left: 0;
-            /* 關鍵：透過 scale 放大內部文字 */
             transform: scale(1.15); 
             transform-origin: top left;
-            width: 86.95% !important; /* 100 / 1.15 補償寬度 */
-            height: 86.95% !important; /* 100 / 1.15 補償高度 */
+            width: 86.95% !important; 
+            height: 86.95% !important; 
             transition: opacity 0.5s ease;
+        }
+
+        /* 深色模式下的圖表濾鏡 */
+        .dark iframe {
+            filter: invert(0.9) hue-rotate(180deg) brightness(1.2) contrast(0.85);
         }
 
         .section-header {
@@ -81,64 +90,95 @@
         .section-header::before {
             content: '';
             position: absolute;
-            left: 0; top: 0; bottom: 0; width: 8px;
+            left: 0; top: 0; bottom: 0; width: 0.5rem;
             background: #3B82F6; border-radius: 4px;
         }
 
         .tab-active {
             background-color: #3B82F6;
             color: #FFFFFF !important;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.6);
+            box-shadow: 0 0.25rem 1rem rgba(59, 130, 246, 0.6);
             transform: scale(1.05);
         }
 
         .retry-btn {
-            font-size: 14px;
+            font-size: 0.8rem;
             font-weight: 900;
             background: #3B82F6;
             color: white;
-            padding: 8px 20px;
-            border-radius: 10px;
+            padding: 0.4rem 1rem;
+            border-radius: 0.6rem;
             transition: all 0.2s ease;
             text-transform: uppercase;
         }
         .retry-btn:hover { background: #2563EB; transform: scale(1.1); }
-        .retry-btn:active { transform: scale(0.95); }
 
         .loading-overlay {
             position: absolute;
             inset: 0;
             z-index: 10;
-            background-color: #1E293B;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             gap: 1rem;
         }
+
+        /* 控制器樣式 */
+        .control-panel {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .fs-btn-active {
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .dark .fs-btn-active {
+            background-color: #334155;
+        }
     </style>
 </head>
-<body class="min-h-screen pb-32">
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 min-h-screen pb-32">
 
     <!-- 頂部標題與控制項 -->
-    <header class="bg-[#0F172A] border-b border-slate-700 p-8 shadow-2xl">
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-8 shadow-sm">
         <div class="max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-8">
             <div class="text-center lg:text-left">
-                <h1 class="text-5xl md:text-8xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-white to-emerald-400">
-                    TRENDS 監控中心
+                <h1 class="text-5xl md:text-7xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-blue-400 to-emerald-500 dark:from-blue-400 dark:via-white dark:to-emerald-400">
+                    健康2.0 Google Trends 監控
                 </h1>
-                <p class="text-white text-xl md:text-3xl mt-4 font-bold flex items-center justify-center lg:justify-start gap-3">
-                    <span class="inline-block w-5 h-5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.5)]"></span>
-                    台灣區域 (TW) · <span id="current-range-text" class="text-blue-400 font-black">過去 7 天</span>
-                </p>
+                <div class="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-8">
+                    <!-- 主題切換 -->
+                    <div class="control-panel">
+                        <span class="text-xs font-bold uppercase tracking-wider opacity-60">風格</span>
+                        <select id="theme-select" onchange="applyTheme(this.value)" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                            <option value="auto">🌓 自動</option>
+                            <option value="light">☀️ 淺色</option>
+                            <option value="dark">🌙 深色</option>
+                        </select>
+                    </div>
+
+                    <!-- 全局字體大小切換 -->
+                    <div class="control-panel border-l border-slate-200 dark:border-slate-700 pl-8">
+                        <span class="text-xs font-bold uppercase tracking-wider opacity-60">顯示比例</span>
+                        <div class="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <button onclick="updateFontSize(14)" id="fs-sm" class="px-5 py-2 text-xs font-bold rounded-lg transition-all">標準</button>
+                            <button onclick="updateFontSize(18)" id="fs-md" class="px-5 py-2 text-xs font-bold rounded-lg transition-all">較大</button>
+                            <button onclick="updateFontSize(22)" id="fs-lg" class="px-5 py-2 text-xs font-bold rounded-lg transition-all">特大</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
+            <!-- 7天/30天切換按鈕 -->
             <div class="flex flex-col items-center lg:items-end gap-6">
-                <div class="inline-flex p-2 bg-slate-800 rounded-2xl border-2 border-slate-600 shadow-inner">
-                    <button onclick="switchTimeRange('now 7-d')" id="btn-7d" class="px-12 py-4 text-2xl font-black rounded-xl transition-all tab-active text-white">
+                <div class="inline-flex p-2 bg-slate-100 dark:bg-slate-800 rounded-3xl border-2 border-slate-200 dark:border-slate-700 shadow-inner">
+                    <button onclick="switchTimeRange('now 7-d')" id="btn-7d" class="px-10 py-4 text-xl md:text-2xl font-black rounded-2xl transition-all tab-active">
                         過去 7 天
                     </button>
-                    <button onclick="switchTimeRange('today 1-m')" id="btn-30d" class="px-12 py-4 text-2xl font-black rounded-xl transition-all text-slate-400 hover:text-white ml-2">
+                    <button onclick="switchTimeRange('today 1-m')" id="btn-30d" class="px-10 py-4 text-xl md:text-2xl font-black rounded-2xl transition-all text-slate-500 dark:text-slate-400 hover:text-white ml-2">
                         過去 30 天
                     </button>
                 </div>
@@ -152,10 +192,10 @@
         </div>
     </main>
 
-    <footer class="max-w-7xl mx-auto mt-32 pt-16 border-t border-slate-700 text-center">
-        <p class="font-black text-white text-4xl mb-4">資料來源：Google Trends</p>
-        <p class="text-slate-400 text-2xl max-w-4xl mx-auto font-bold">
-            ※ 載入圖表約需 25 秒全數完成。若顯示「Request Error」，請點擊卡片右上角的 <span class="text-blue-400">RETRY</span> 重新讀取。
+    <footer class="max-w-7xl mx-auto mt-32 pt-16 border-t border-slate-200 dark:border-slate-800 text-center">
+        <p class="font-black text-slate-800 dark:text-white text-4xl mb-4">資料來源：Google Trends</p>
+        <p class="text-slate-500 dark:text-slate-400 text-xl max-w-4xl mx-auto font-bold">
+            ※ 載入圖表約需 25 秒全數完成。若顯示「Request Error」，請點擊卡片右上角的 <span class="text-blue-500">RETRY</span> 重新讀取。
         </p>
     </footer>
 
@@ -194,10 +234,65 @@
         let isRendering = false;
 
         window.onload = function() {
+            initTheme();
+            initFontSize();
             renderStructure();
             startSequentialLoad(currentTimeRange);
         };
 
+        // --- 全局字體大小/縮放邏輯 ---
+        function initFontSize() {
+            const savedSize = localStorage.getItem('globalFontSize') || 18;
+            updateFontSize(parseInt(savedSize));
+        }
+
+        function updateFontSize(px) {
+            document.documentElement.style.setProperty('--root-font-size', px + 'px');
+            localStorage.setItem('globalFontSize', px);
+            
+            // 更新選取按鈕的視覺狀態
+            const btns = { 14: 'fs-sm', 18: 'fs-md', 22: 'fs-lg' };
+            Object.keys(btns).forEach(size => {
+                const el = document.getElementById(btns[size]);
+                if (parseInt(size) === px) {
+                    el.classList.add('fs-btn-active');
+                } else {
+                    el.classList.remove('fs-btn-active');
+                }
+            });
+        }
+
+        // --- 主題切換邏輯 ---
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'auto';
+            document.getElementById('theme-select').value = savedTheme;
+            applyTheme(savedTheme);
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            localStorage.setItem('theme', theme);
+            
+            if (theme === 'dark') {
+                html.classList.add('dark');
+            } else if (theme === 'light') {
+                html.classList.remove('dark');
+            } else {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    html.classList.add('dark');
+                } else {
+                    html.classList.remove('dark');
+                }
+            }
+        }
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (localStorage.getItem('theme') === 'auto') {
+                applyTheme('auto');
+            }
+        });
+
+        // --- 儀表板建構與載入 ---
         function renderStructure() {
             const container = document.getElementById('dashboard-content');
             container.innerHTML = '';
@@ -208,7 +303,7 @@
                     currentGroup = cat.group;
                     const header = document.createElement('div');
                     header.className = 'section-header w-full';
-                    header.innerHTML = `<h2 class="text-5xl font-black text-blue-400 tracking-widest uppercase">${cat.groupName}</h2>`;
+                    header.innerHTML = `<h2 class="text-4xl font-black text-blue-600 dark:text-blue-400 tracking-widest uppercase">${cat.groupName}</h2>`;
                     container.appendChild(header);
 
                     const grid = document.createElement('div');
@@ -219,17 +314,17 @@
 
                 const gridContainer = document.getElementById(`grid-${cat.group}`);
                 const card = document.createElement('div');
-                card.className = 'trends-card relative';
+                card.className = 'trends-card relative bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 shadow-lg dark:shadow-2xl';
                 const uniqueId = cat.id || `kw-${index}`;
                 card.innerHTML = `
-                    <div class="px-8 py-6 border-b border-slate-700 bg-slate-800/80 flex items-center justify-between">
-                        <h3 class="font-black text-3xl text-white tracking-tight">${cat.name}</h3>
+                    <div class="px-8 py-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
+                        <h3 class="font-black text-2xl text-slate-800 dark:text-white tracking-tight">${cat.name}</h3>
                         <button onclick="loadWidgetByIndex(${index}, currentTimeRange)" class="retry-btn">RETRY</button>
                     </div>
                     <div class="widget-container">
-                        <div id="loading-${uniqueId}" class="loading-overlay">
-                            <div class="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-                            <span class="text-slate-400 font-bold text-2xl animate-pulse">載入中...</span>
+                        <div id="loading-${uniqueId}" class="loading-overlay bg-white dark:bg-slate-800">
+                            <div class="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                            <span class="loading-text font-bold text-lg animate-pulse text-slate-500 dark:text-slate-400">載入中</span>
                         </div>
                         <div id="trend-widget-${uniqueId}" class="w-full h-full"></div>
                     </div>
@@ -257,7 +352,7 @@
             if (!container) return;
             
             container.innerHTML = '';
-            loader.style.display = 'flex';
+            if (loader) loader.style.display = 'flex';
             
             const comparisonItem = cat.keyword 
                 ? [{ "keyword": cat.keyword, "geo": "TW", "time": range }]
@@ -282,11 +377,11 @@
                     }
                 );
                 setTimeout(() => {
-                    loader.style.display = 'none';
+                    if (loader) loader.style.display = 'none';
                 }, 2500);
             } catch (e) {
                 console.error(e);
-                loader.innerHTML = `<span class="text-red-500 font-bold text-xl">載入失敗，請重試</span>`;
+                if (loader) loader.innerHTML = `<span class="text-red-500 font-bold text-lg">FAIL</span>`;
             }
         }
 
@@ -294,9 +389,8 @@
             if (currentTimeRange === range || isRendering) return;
             currentTimeRange = range;
 
-            document.getElementById('btn-7d').className = `px-12 py-4 text-2xl font-black rounded-xl transition-all ${range === 'now 7-d' ? 'tab-active text-white' : 'text-slate-400 hover:text-white'}`;
-            document.getElementById('btn-30d').className = `px-12 py-4 text-2xl font-black rounded-xl transition-all ml-2 ${range === 'today 1-m' ? 'tab-active text-white' : 'text-slate-400 hover:text-white'}`;
-            document.getElementById('current-range-text').innerText = range === 'now 7-d' ? '過去 7 天' : '過去 30 天';
+            document.getElementById('btn-7d').className = `px-10 py-4 text-xl md:text-2xl font-black rounded-2xl transition-all ${range === 'now 7-d' ? 'tab-active' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`;
+            document.getElementById('btn-30d').className = `px-10 py-4 text-xl md:text-2xl font-black rounded-2xl transition-all ml-2 ${range === 'today 1-m' ? 'tab-active' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`;
 
             renderStructure();
             startSequentialLoad(range);
