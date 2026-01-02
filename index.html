@@ -37,7 +37,7 @@
                 <button onclick="handleSaveApiKey()" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 active:scale-[0.98] transition-all shadow-lg shadow-indigo-600/20">開始實驗</button>
                 <p class="text-[10px] text-center text-neutral-600 mt-6 underline italic"><a href="https://aistudio.google.com/" target="_blank">點此前往 Google AI Studio 申請免費金鑰</a></p>
                 <div class="mt-8 pt-6 border-t border-neutral-800/50">
-                    <p class="text-[9px] text-center text-neutral-700 font-mono tracking-widest opacity-50 uppercase">Build Version: 20260101.2000 (Open Response Edition)</p>
+                    <p class="text-[9px] text-center text-neutral-700 font-mono tracking-widest opacity-50 uppercase">Build Version: 20260101.2100 (SEO Precision Boost)</p>
                 </div>
             </div>
         </div>
@@ -253,11 +253,15 @@
             setLoadingState(true, true);
             try {
                 const historyText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
-                const prompt = `請分析此對話內容，產出專為編輯團隊設計的 SEO/GEO 分析報告（JSON格式）：
-                1. "characterQuestions": 提取該角色最有潛力轉換為 SEO 文章標題的 3 個問題（必須包含搜尋意圖）。
-                2. "barriers": 識別該族群入睡的 2 個主要障礙。
-                3. "seoKeywords": 5 個高價值的內容關鍵字。
-                4. "aiOverviewStrategy": 如何優化文章結構，以獲得 AI Overview (SGE) 的優先引用建議。
+                // 深度優化 SEO 關鍵字提取指令
+                const prompt = `請深度分析此對話內容，為健康醫療記者產出精準的 SEO/GEO 分析報告（JSON格式）：
+                1. "characterQuestions": 提取 3 個「具備高度搜尋意圖」的問題。必須模擬真實使用者在搜尋引擎輸入的完整句子，且能直接作為 SEO 文章的 H2 標題。
+                2. "barriers": 識別該族群入睡的 2 個核心心理或生理障礙，這將作為文章的「解決方案」重點。
+                3. "seoKeywords": 提取 5 個精準關鍵字。要求：
+                   - 避開過於寬泛的詞（如「失眠」）。
+                   - 包含「長尾關鍵字」（如「更年期熱潮紅睡不著」）。
+                   - 包含「行為詞」或「比較詞」（如「褪黑激素有用嗎」、「自律神經失調中醫 vs 西醫」）。
+                4. "aiOverviewStrategy": 針對 Google AI Overview (SGE) 提供 1 個具體的寫作優化建議，說明如何讓 AI 優先提取本文作為來源。
                 對話紀錄：\n${historyText}`;
                 
                 const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${userApiKey}`, { 
@@ -272,7 +276,7 @@
         function renderAnalysisReport(data) {
             document.getElementById('analysis-report').classList.remove('hidden-el');
             const content = document.getElementById('analysis-content');
-            content.innerHTML = `<div class="space-y-6"><section><h4 class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">搜尋意圖標題 (SEO)</h4>${data.characterQuestions.map(q => `<div class="p-3 bg-indigo-950/20 rounded-xl border border-indigo-900/30 mb-2 text-xs italic">「${q}」</div>`).join('')}</section><section><h4 class="text-[9px] font-black text-red-500 uppercase tracking-widest mb-2">關鍵入睡障礙</h4><ul class="text-neutral-400 space-y-1 text-xs">${data.barriers.map(b => `<li>• ${b}</li>`).join('')}</ul></section></div><div class="space-y-6"><section><h4 class="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2">內容關鍵字佈局</h4><div class="flex flex-wrap gap-1.5">${data.seoKeywords.map(k => `<span class="px-2 py-0.5 bg-neutral-800 text-emerald-400 text-[9px] rounded border border-neutral-700">${k}</span>`).join('')}</div></section><section><h4 class="text-[9px] font-black text-yellow-400 uppercase tracking-widest mb-2">AI Overview 引用策略</h4><div class="p-3 bg-yellow-900/10 rounded-xl border border-yellow-900/20 text-neutral-300 text-xs leading-relaxed">${data.aiOverviewStrategy}</div></section></div>`;
+            content.innerHTML = `<div class="space-y-6"><section><h4 class="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">精選搜尋意圖 (H2 標題建議)</h4>${data.characterQuestions.map(q => `<div class="p-3 bg-indigo-950/20 rounded-xl border border-indigo-900/30 mb-2 text-xs font-bold italic">「${q}」</div>`).join('')}</section><section><h4 class="text-[9px] font-black text-red-500 uppercase tracking-widest mb-2">核心障礙解析</h4><ul class="text-neutral-400 space-y-1 text-xs">${data.barriers.map(b => `<li>• ${b}</li>`).join('')}</ul></section></div><div class="space-y-6"><section><h4 class="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2">高價值長尾/精準詞</h4><div class="flex flex-wrap gap-1.5">${data.seoKeywords.map(k => `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] rounded border border-emerald-500/20 font-bold">${k}</span>`).join('')}</div></section><section><h4 class="text-[9px] font-black text-yellow-400 uppercase tracking-widest mb-2">GEO (AI Overview) 優化策略</h4><div class="p-3 bg-yellow-900/10 rounded-xl border border-yellow-900/20 text-neutral-300 text-xs leading-relaxed font-medium">${data.aiOverviewStrategy}</div></section></div>`;
             lucide.createIcons();
         }
 
