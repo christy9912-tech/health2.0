@@ -16,6 +16,7 @@
         
         :root {
             --root-font-size: 18px;
+            --widget-scale: 1.15; /* 新增變數控制面板內容縮放 */
         }
 
         /* 透過根目錄字體大小控制全局比例 */
@@ -38,7 +39,7 @@
             border-radius: 1.5rem;
             overflow: hidden;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            height: 40rem; /* 高度隨字體大小縮放 */
+            height: 42rem; /* 稍微增加高度以容納放大後的內容 */
             display: flex;
             flex-direction: column;
         }
@@ -63,17 +64,18 @@
             position: relative;
         }
 
-        /* 核心縮放：保持 1.15 倍以放大內容，但容器隨全局縮放 */
+        /* 核心縮放：讓 scale 與 --widget-scale 變數連動 */
         iframe {
             border-radius: 0 0 1.5rem 1.5rem;
             position: absolute;
             top: 0;
             left: 0;
-            transform: scale(1.15); 
+            transform: scale(var(--widget-scale)); 
             transform-origin: top left;
-            width: 86.95% !important; 
-            height: 86.95% !important; 
-            transition: opacity 0.5s ease;
+            /* 動態計算寬高以補償縮放後的偏移 */
+            width: calc(100% / var(--widget-scale)) !important; 
+            height: calc(100% / var(--widget-scale)) !important; 
+            transition: opacity 0.5s ease, transform 0.2s ease;
         }
 
         /* 深色模式下的圖表濾鏡 */
@@ -247,7 +249,14 @@
         }
 
         function updateFontSize(px) {
+            // 1. 更新根字體大小
             document.documentElement.style.setProperty('--root-font-size', px + 'px');
+            
+            // 2. 計算面板內部縮放比例 (scale)
+            // 標準(14px) -> 1.05倍, 較大(18px) -> 1.25倍, 特大(22px) -> 1.45倍
+            const widgetScale = 1.05 + ((px - 14) / 4) * 0.2;
+            document.documentElement.style.setProperty('--widget-scale', widgetScale);
+            
             localStorage.setItem('globalFontSize', px);
             
             // 更新選取按鈕的視覺狀態
